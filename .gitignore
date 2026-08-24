@@ -1,0 +1,10 @@
+.idea/
+.venv/
+.venv39/
+__pycache__/
+*.py[cod]
+
+# Re-downloadable Fashion-MNIST source data and training caches.
+data/FashionMNIST/
+data/fashion_mnist_resnet18_features.pt
+data/pretrained/
