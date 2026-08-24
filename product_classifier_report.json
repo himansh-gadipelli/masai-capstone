@@ -1,0 +1,311 @@
+{
+  "source": "torchvision.datasets.FashionMNIST (Zalando Research)",
+  "splits": {
+    "train": 55000,
+    "validation": 5000,
+    "test": 10000
+  },
+  "preprocessing": {
+    "channels": 3,
+    "image_size": [
+      224,
+      224
+    ],
+    "normalization_mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "normalization_std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "training": {
+    "backbone": "ImageNet-pretrained ResNet-18",
+    "image_batch_size": 128,
+    "head_batch_size": 512,
+    "optimizer": "Adam",
+    "head_learning_rate": 0.001,
+    "head_epochs": 20,
+    "head_validation_history": [
+      0.8682,
+      0.8832,
+      0.8896,
+      0.8962,
+      0.9032,
+      0.9076,
+      0.9058,
+      0.907,
+      0.9008,
+      0.9058,
+      0.903,
+      0.9116,
+      0.907,
+      0.9108,
+      0.911,
+      0.9126,
+      0.9148,
+      0.912,
+      0.9158,
+      0.9144
+    ],
+    "feature_extraction_validation_accuracy": 0.9158,
+    "fine_tuning_required": false,
+    "fine_tune_learning_rate": 1e-05,
+    "fine_tune_epochs": 0,
+    "fine_tune_validation_history": [],
+    "final_validation_accuracy": 0.9158
+  },
+  "test_accuracy": 0.9043,
+  "confusion_matrix": [
+    [
+      830,
+      2,
+      12,
+      28,
+      3,
+      1,
+      119,
+      0,
+      4,
+      1
+    ],
+    [
+      3,
+      973,
+      1,
+      17,
+      1,
+      1,
+      4,
+      0,
+      0,
+      0
+    ],
+    [
+      10,
+      0,
+      854,
+      12,
+      48,
+      0,
+      75,
+      0,
+      1,
+      0
+    ],
+    [
+      9,
+      5,
+      7,
+      926,
+      21,
+      0,
+      31,
+      0,
+      1,
+      0
+    ],
+    [
+      0,
+      1,
+      44,
+      42,
+      842,
+      1,
+      67,
+      0,
+      3,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      955,
+      0,
+      32,
+      0,
+      13
+    ],
+    [
+      91,
+      0,
+      33,
+      43,
+      70,
+      0,
+      758,
+      0,
+      4,
+      1
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      10,
+      0,
+      957,
+      0,
+      33
+    ],
+    [
+      1,
+      0,
+      0,
+      4,
+      0,
+      3,
+      7,
+      0,
+      985,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      10,
+      0,
+      27,
+      0,
+      963
+    ]
+  ],
+  "per_class": {
+    "T-shirt/top": {
+      "precision": 0.8792372881355932,
+      "recall": 0.83,
+      "f1-score": 0.8539094650205762,
+      "support": 1000
+    },
+    "Trouser": {
+      "precision": 0.9918450560652395,
+      "recall": 0.973,
+      "f1-score": 0.9823321554770318,
+      "support": 1000
+    },
+    "Pullover": {
+      "precision": 0.8980021030494216,
+      "recall": 0.854,
+      "f1-score": 0.8754484879548949,
+      "support": 1000
+    },
+    "Dress": {
+      "precision": 0.8638059701492538,
+      "recall": 0.926,
+      "f1-score": 0.8938223938223938,
+      "support": 1000
+    },
+    "Coat": {
+      "precision": 0.8548223350253807,
+      "recall": 0.842,
+      "f1-score": 0.8483627204030226,
+      "support": 1000
+    },
+    "Sandal": {
+      "precision": 0.9734964322120285,
+      "recall": 0.955,
+      "f1-score": 0.9641595153962645,
+      "support": 1000
+    },
+    "Shirt": {
+      "precision": 0.7144203581526861,
+      "recall": 0.758,
+      "f1-score": 0.7355652595827268,
+      "support": 1000
+    },
+    "Sneaker": {
+      "precision": 0.9419291338582677,
+      "recall": 0.957,
+      "f1-score": 0.9494047619047619,
+      "support": 1000
+    },
+    "Bag": {
+      "precision": 0.9869739478957916,
+      "recall": 0.985,
+      "f1-score": 0.985985985985986,
+      "support": 1000
+    },
+    "Ankle boot": {
+      "precision": 0.9525222551928784,
+      "recall": 0.963,
+      "f1-score": 0.95773247140726,
+      "support": 1000
+    }
+  },
+  "largest_directional_confusions": [
+    [
+      119,
+      "T-shirt/top",
+      "Shirt"
+    ],
+    [
+      91,
+      "Shirt",
+      "T-shirt/top"
+    ],
+    [
+      75,
+      "Pullover",
+      "Shirt"
+    ],
+    [
+      70,
+      "Shirt",
+      "Coat"
+    ],
+    [
+      67,
+      "Coat",
+      "Shirt"
+    ],
+    [
+      48,
+      "Pullover",
+      "Coat"
+    ],
+    [
+      44,
+      "Coat",
+      "Pullover"
+    ],
+    [
+      43,
+      "Shirt",
+      "Dress"
+    ],
+    [
+      42,
+      "Coat",
+      "Dress"
+    ],
+    [
+      33,
+      "Sneaker",
+      "Ankle boot"
+    ]
+  ],
+  "sample_images": [
+    "data/sample_images/00019_t-shirt_top.png",
+    "data/sample_images/00002_trouser.png",
+    "data/sample_images/00001_pullover.png",
+    "data/sample_images/00013_dress.png",
+    "data/sample_images/00006_coat.png",
+    "data/sample_images/00008_sandal.png",
+    "data/sample_images/00004_shirt.png",
+    "data/sample_images/00009_sneaker.png",
+    "data/sample_images/00018_bag.png",
+    "data/sample_images/00000_ankle_boot.png"
+  ],
+  "artifact": "models/product_classifier.pt"
+}

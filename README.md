@@ -1,158 +1,152 @@
-# E-commerce Return-Risk Model
+# Part 2 — Product Image Categoriser
 
-This project trains and evaluates return-risk classifiers on the seeded order
-dataset. Run the complete reproducible workflow with:
+This project classifies Flipkart-style apparel, footwear, and accessories using
+transfer learning on the canonical
+[Zalando Research Fashion-MNIST dataset](https://github.com/zalandoresearch/fashion-mnist).
+It uses `torchvision.datasets.FashionMNIST` without substituting or simulating
+data.
+
+## Reproduce training
+
+PyTorch 2.2 requires Python 3.9–3.12. The run reported below used Python 3.9.6:
 
 ```bash
-python3 -m pip install -r requirements.txt
-python3 train_and_evaluate_pt1.py
+python3 -m venv .venv39
+.venv39/bin/pip install -r requirements.txt
+.venv39/bin/python train_product_classifier.py
 ```
 
-The run writes detailed results to `model_report.json`, full threshold sweeps
-to CSV, and the final fitted pipeline to `models/return_risk_model.pkl`.
+The script downloads Fashion-MNIST and the official ImageNet-pretrained
+ResNet-18 weights automatically. It caches frozen backbone features in `data/`
+so future head-training runs do not repeat the expensive CNN forward pass.
 
-## Data verification
+## Dataset and untouched split
 
-The dataset has exactly **6,000 rows and 13 columns**. There are 1,365 returned
-orders, for an overall return rate of **22.75%**. `rating_given` is missing in
-783 rows, or **13.05%**.
+The standard 60,000-image Fashion-MNIST training split was divided with a
+stratified split (`random_state=42`); the official test set was not passed
+through the model until validation-based model selection was finished.
 
-| Product category | Rows | Returns | Return rate |
-|---|---:|---:|---:|
-| Apparel | 1,979 | 523 | 26.43% |
-| Beauty | 579 | 116 | 20.03% |
-| Electronics | 1,316 | 246 | 18.69% |
-| Footwear | 1,071 | 278 | 25.96% |
-| Home | 1,055 | 202 | 19.15% |
+| Split | Images | Purpose |
+|---|---:|---|
+| Training | 55,000 | Fit the classifier head |
+| Validation | 5,000 | Select the best head epoch and decide on fine-tuning |
+| Test | 10,000 | One final evaluation only |
 
-| Payment method | Rows | Returns | Return rate |
-|---|---:|---:|---:|
-| COD | 2,501 | 769 | 30.75% |
-| Prepaid Card | 1,457 | 245 | 16.82% |
-| Prepaid UPI | 1,448 | 245 | 16.92% |
-| Wallet | 594 | 106 | 17.85% |
+## Preprocessing and transfer learning
 
-The missingness mechanism is **MAR (missing at random conditional on the
-observed `payment_method`)**. The measured missing-rating rate is **22.83% for
-COD versus 6.06% for all non-COD orders combined**. It is not MCAR because
-missingness depends on payment method, and it is not MNAR because the generator
-does not use the unobserved `rating_given` value to decide whether to hide it.
+Each 28×28 grayscale image is replicated to three channels, resized to
+**224×224**, converted to a tensor, and normalized with the ImageNet statistics
+used for ResNet-18: mean `(0.485, 0.456, 0.406)` and standard deviation
+`(0.229, 0.224, 0.225)`.
 
-## Leakage-safe preprocessing
+The early and middle ResNet-18 backbone layers were frozen. Its 512-dimensional
+output was extracted and cached once for each training and validation image.
+A new `512 → 256 → ReLU → Dropout(0.2) → 10` classifier head was trained with:
 
-Raw data is split into a stratified 80/20 train/test split with
-`random_state=42` before preprocessing. A `ColumnTransformer` inside each
-scikit-learn `Pipeline` median-imputes and standard-scales numeric features,
-and mode-imputes and one-hot encodes `product_category` and `payment_method`.
-It is fitted on the 4,800 training rows only; the 1,200 test rows are only
-passed to `transform`. `order_id` and `returned` are excluded from predictors.
+- Optimizer: Adam
+- Learning rate: 0.001
+- Image extraction batch size: 128
+- Cached-feature head batch size: 512
+- Epochs: 20
 
-## Dummy baseline
+**Feature extraction alone was sufficient.** Its best validation accuracy was
+**91.58%** at epoch 19, above the 80% fine-tuning trigger. Consequently no
+backbone layer was unfrozen: validation accuracy before fine-tuning was 91.58%
+and after the fine-tuning decision remained **91.58% (no fine-tuning run)**.
+Had it fallen below 80%, the script would have unfrozen only ResNet `layer4`
+for three Adam epochs at the lower learning rate `1e-5`.
 
-| Accuracy | F1 (`returned=1`) | Recall (`returned=1`) |
-|---:|---:|---:|
-| 77.25% | 0.0000 | 0.00% |
+## Held-out test evaluation
 
-The apparently high accuracy is misleading because the most-frequent dummy
-always predicts “not returned.” This is the **high accuracy, zero recall** trap:
-it misses every return, the outcome the business needs to detect. Honest
-evaluation therefore compares against a baseline and uses F1/recall metrics
-aligned with return detection instead of accuracy alone.
+Final accuracy on the untouched 10,000-image test set was **90.43%**.
 
-## Logistic Regression
+### Per-class metrics
 
-The model uses `class_weight="balanced"`. At the default 0.50 threshold:
+| Class | Precision | Recall | F1 | Support |
+|---|---:|---:|---:|---:|
+| T-shirt/top | 87.92% | 83.00% | 85.39% | 1,000 |
+| Trouser | 99.18% | 97.30% | 98.23% | 1,000 |
+| Pullover | 89.80% | 85.40% | 87.54% | 1,000 |
+| Dress | 86.38% | 92.60% | 89.38% | 1,000 |
+| Coat | 85.48% | 84.20% | 84.84% | 1,000 |
+| Sandal | 97.35% | 95.50% | 96.42% | 1,000 |
+| Shirt | 71.44% | 75.80% | 73.56% | 1,000 |
+| Sneaker | 94.19% | 95.70% | 94.94% | 1,000 |
+| Bag | 98.70% | 98.50% | 98.60% | 1,000 |
+| Ankle boot | 95.25% | 96.30% | 95.77% | 1,000 |
 
-| Accuracy | F1 | Recall | Precision | ROC-AUC |
-|---:|---:|---:|---:|---:|
-| 59.17% | 0.3921 | 57.88% | 29.64% | 0.6253 |
+### Confusion matrix
 
-The threshold was swept from 0.10 through 0.90 in increments of 0.01. The full
-81-row result is in `logistic_threshold_sweep.csv`; representative F1 values
-are tabulated here:
+Rows are actual classes and columns are predicted classes, in this order:
+`T-shirt/top`, `Trouser`, `Pullover`, `Dress`, `Coat`, `Sandal`, `Shirt`,
+`Sneaker`, `Bag`, `Ankle boot`.
 
-| Threshold | 0.10 | 0.20 | 0.30 | 0.40 | **0.44** | 0.50 | 0.60 | 0.70 | 0.80 | 0.90 |
+| Actual \ Predicted | T-shirt | Trouser | Pullover | Dress | Coat | Sandal | Shirt | Sneaker | Bag | Boot |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| F1 | .3707 | .3707 | .3762 | .4011 | **.4091** | .3921 | .3225 | .1288 | .0000 | .0000 |
+| T-shirt/top | 830 | 2 | 12 | 28 | 3 | 1 | 119 | 0 | 4 | 1 |
+| Trouser | 3 | 973 | 1 | 17 | 1 | 1 | 4 | 0 | 0 | 0 |
+| Pullover | 10 | 0 | 854 | 12 | 48 | 0 | 75 | 0 | 1 | 0 |
+| Dress | 9 | 5 | 7 | 926 | 21 | 0 | 31 | 0 | 1 | 0 |
+| Coat | 0 | 1 | 44 | 42 | 842 | 1 | 67 | 0 | 3 | 0 |
+| Sandal | 0 | 0 | 0 | 0 | 0 | 955 | 0 | 32 | 0 | 13 |
+| Shirt | 91 | 0 | 33 | 43 | 70 | 0 | 758 | 0 | 4 | 1 |
+| Sneaker | 0 | 0 | 0 | 0 | 0 | 10 | 0 | 957 | 0 | 33 |
+| Bag | 1 | 0 | 0 | 4 | 0 | 3 | 7 | 0 | 985 | 0 |
+| Ankle boot | 0 | 0 | 0 | 0 | 0 | 10 | 0 | 27 | 0 | 963 |
 
-The F1-maximising threshold is **0.44**, with **75.82% recall** and **28.01%
-precision**. Relative to 0.50, recall rises by **17.95 percentage points** and
-precision falls by **1.63 points**. Lowering the threshold makes missed returns
-(false negatives) more expensive to avoid, while accepting more false alarms
-(false positives) and their review/intervention cost.
+The largest confusion is **T-shirt/top → Shirt (119 images)**, with another 91
+shirts classified as T-shirts. At only 28×28 grayscale resolution, both have a
+short-sleeved torso silhouette and a similar neckline. The primary distinction
+is subtle structure such as a collar, placket, or sleeve cut, which can occupy
+only a few pixels and is further softened by resizing.
 
-## Tuned Random Forest
+The next distinct pair is **Pullover → Shirt (75 images)**; 33 shirts also went
+the other direction. Both appear as upper-body garments with sleeves and a
+central torso block. Fashion-MNIST removes color and fabric texture, so sleeve
+length, neckline, and garment thickness are the remaining cues; pose and loose
+fits can make those silhouettes overlap substantially.
 
-`GridSearchCV` used ROC-AUC scoring and five-fold shuffled `StratifiedKFold`
-cross-validation. It tested `n_estimators` in `[100, 200]` and `max_depth` in
-`[6, 10, None]` with `class_weight="balanced"` and `random_state=42`.
+A third strong pair is **Shirt ↔ Coat**: 70 shirts were predicted as coats and
+67 coats as shirts. Both commonly have long sleeves and an open or structured
+front. In a small monochrome silhouette, coat length, lapels, and heavier fabric
+are weak signals, especially when the photographed item is cropped similarly.
 
-| Best `n_estimators` | Best `max_depth` | Best CV ROC-AUC | Test ROC-AUC | Absolute gap |
-|---:|---:|---:|---:|---:|
-| 200 | 6 | 0.6192 | 0.6203 | 0.0011 |
+All matrix values and confusion pairs above come from the saved model's real
+predictions and are also stored in `product_classifier_report.json`.
 
-The tiny CV/test gap is evidence against severe overfitting. Repeating the
-threshold sweep on this Random Forest's own held-out `predict_proba` output
-gives **t\*_rf = 0.50**, with F1 0.4076, recall 54.95%, and precision 32.40%.
-Its full sweep is in `random_forest_threshold_sweep.csv`; it is deliberately
-not calibrated using the Logistic Regression threshold.
+## Saved artifact and one-image prediction
 
-## Feature importance and explanation
+The trained weights are saved at `models/product_classifier.pt`. The reusable
+loader and inference function are implemented in `product_classifier.py`; they
+construct the architecture without downloading backbone weights, load the
+state dict, apply the same preprocessing, and call the model's real softmax
+output.
 
-Permutation importance uses held-out ROC-AUC with 20 deterministic repeats.
+```python
+from product_classifier import classify_product_image
 
-| Feature | Impurity importance (rank) | Permutation importance (rank within top 5) |
-|---|---:|---:|
-| `payment_method_COD` | 0.1788 (1) | 0.0651 (1) |
-| `price_inr` | 0.1323 (2) | 0.0124 (2) |
-| `delivery_distance_km` | 0.0957 (3) | 0.0006 (4) |
-| `customer_tenure_days` | 0.0900 (4) | -0.0051 (5) |
-| `delivery_days` | 0.0884 (5) | 0.0030 (3) |
+label, confidence = classify_product_image(
+    "data/sample_images/00009_sneaker.png"
+)
+print(label, confidence)
+```
 
-COD plausibly raises risk because the generator explicitly assigns it higher
-return log-odds. Higher-priced purchases can prompt more scrutiny and price is
-also in the generating equation. Tenure captures customer familiarity and is
-explicitly protective in the generator. Slower delivery may increase
-dissatisfaction and is explicitly included in return risk. Distance might look
-plausible as a delivery-friction proxy, but it is absent from the true equation.
+Part 3's `classify_product_image(image_path)` tool should call this exact
+function rather than use a hardcoded category.
 
-`delivery_distance_km` and especially `customer_tenure_days` lose most of their
-apparent value under permutation (distance falls from 0.0957 to 0.0006 and
-tenure to a negative test-set importance). Impurity importance can overrate a
-noisy continuous feature because its many possible split points give a tree
-more chances to find accidental training-set improvements; held-out
-permutation importance exposes whether those splits generalise.
+## Exported real test images
 
-## Subgroup analysis
+`data/sample_images/` contains ten actual PNG files exported directly from the
+official Fashion-MNIST test split—one per class. Their true labels are embedded
+in their filenames:
 
-Metrics use the selected Random Forest and t\*_rf = 0.50. Overall recall is
-54.95% and precision is 32.40%.
-
-| Product category | Test rows | Actual returns | Recall | Precision |
-|---|---:|---:|---:|---:|
-| Apparel | 385 | 100 | 52.00% | 31.71% |
-| Beauty | 116 | 31 | 61.29% | 47.50% |
-| Electronics | 261 | 52 | 44.23% | 32.86% |
-| Footwear | 217 | 56 | 58.93% | 36.26% |
-| Home | 221 | 34 | 67.65% | 23.47% |
-
-| Payment method | Test rows | Actual returns | Recall | Precision |
-|---|---:|---:|---:|---:|
-| COD | 503 | 155 | 93.55% | 32.73% |
-| Prepaid Card | 283 | 49 | 2.04% | 20.00% |
-| Prepaid UPI | 294 | 48 | 4.17% | 33.33% |
-| Wallet | 120 | 21 | 9.52% | 22.22% |
-
-Electronics has meaningfully weaker recall than average (44.23% versus 54.95%),
-and prepaid methods are much weaker still. A concrete next step is to tune
-separate validation-set thresholds for COD and each prepaid method, lowering
-the prepaid thresholds to recover recall while constraining precision to an
-acceptable intervention-cost floor.
-
-## Saved artifact
-
-`models/return_risk_model.pkl` is the fitted winning pipeline containing both
-the preprocessing `ColumnTransformer` and the tuned
-`RandomForestClassifier(max_depth=6, n_estimators=200)`. The training script
-reloads it with `joblib.load` and verifies that its `predict_proba` output is
-identical before reporting success.
+- `00019_t-shirt_top.png`
+- `00002_trouser.png`
+- `00001_pullover.png`
+- `00013_dress.png`
+- `00006_coat.png`
+- `00008_sandal.png`
+- `00004_shirt.png`
+- `00009_sneaker.png`
+- `00018_bag.png`
+- `00000_ankle_boot.png`
